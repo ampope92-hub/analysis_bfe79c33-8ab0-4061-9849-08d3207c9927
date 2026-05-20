@@ -7,9 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python -m pip install --no-cache-dir \
-    pytest==8.4.1 \
-    pytest-json-ctrf==0.3.5 \
-    flask>=3.0.0 \
-    requests>=2.31.0
+    flask==3.1.0 \
+    requests==2.32.3
 
 WORKDIR /app
