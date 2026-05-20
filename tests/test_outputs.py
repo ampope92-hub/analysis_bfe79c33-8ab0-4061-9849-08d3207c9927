@@ -45,14 +45,20 @@ def test_game_script_is_executable():
 
 def test_game_script_accepts_document_argument():
     """game.py uses argparse or sys.argv to accept a document path."""
-    content = Path("/app/game.py").read_text()
-    assert "argparse" in content or "sys.argv" in content
+    doc = next(Path("/app/documents").glob("*.txt"))
+    proc = subprocess.run(
+        [sys.executable, "/app/game.py", str(doc)],
+        input="This is my summary.\n", capture_output=True, text=True,
+        timeout=30
+    )
+    assert proc.returncode == 0
+    assert "word_count" in proc.stdout or "score" in proc.stdout
 
 
 def test_game_script_calls_api():
     """game.py makes HTTP requests to the API."""
     content = Path("/app/game.py").read_text()
-    assert "requests" in content or "urllib" in content
+    assert "requests" in content, "game.py does not appear to use the requests library"
 
 
 def test_requirements_file_exists():
@@ -139,8 +145,10 @@ def test_analyze_returns_word_count(api_server):
     )
     data = r.json()
     assert "word_count" in data, f"word_count missing from response: {data}"
-    assert isinstance(data["word_count"], int)
-    assert data["word_count"] > 0
+    # Input is "hello world testing " * 200 = 600 words
+    assert 580 <= data["word_count"] <= 620, (
+        f"Expected ~600 words, got {data['word_count']}"
+    )
 
 
 def test_analyze_returns_key_terms(api_server):
@@ -154,8 +162,11 @@ def test_analyze_returns_key_terms(api_server):
     data = r.json()
     assert "key_terms" in data, f"key_terms missing from response: {data}"
     assert isinstance(data["key_terms"], list)
-    assert len(data["key_terms"]) > 0
-
+    assert len(data["key_terms"]) >= 2
+    terms_lower = [t.lower() for t in data["key_terms"]]
+    assert any("elephant" in t for t in terms_lower), (
+        f"Expected 'elephant' in key_terms for elephant text: {terms_lower}"
+    )
 
 def test_analyze_returns_estimated_tokens(api_server):
     """POST /analyze response includes estimated_tokens."""
