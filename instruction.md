@@ -13,4 +13,4 @@ Here's the structure I'm picturing:
 
 The `/analyze` response should include at least `word_count`, `key_terms` (a list), and `estimated_tokens`. The `/evaluate` response needs at least `score` (0–100 float) and `feedback` (a string explaining how well they did).
 
-Make sure `game.py` is executable. The API and game should work together when you start Flask in one terminal and run the game script in another.
+Make sure `game.py` is executable. The API and game should work together when you start Flask in one terminal and run the game script in another. One thing — run the Flask app with `debug=False` (or just don't pass `debug=True`). Debug mode spawns a reloader process that can cause weird timeout issues when the server is started in the background.
