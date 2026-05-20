@@ -43,7 +43,7 @@ def test_game_script_is_executable():
     assert os.access("/app/game.py", os.X_OK), "game.py is not executable"
 
 
-def test_game_script_accepts_document_argument():
+def test_game_script_accepts_document_argument(api_server):
     """game.py uses argparse or sys.argv to accept a document path."""
     doc = next(Path("/app/documents").glob("*.txt"))
     proc = subprocess.run(
@@ -51,7 +51,7 @@ def test_game_script_accepts_document_argument():
         input="This is my summary.\n", capture_output=True, text=True,
         timeout=30
     )
-    assert proc.returncode == 0
+    assert proc.returncode == 0, f"game.py exited {proc.returncode}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
     assert "word_count" in proc.stdout or "score" in proc.stdout
 
 
