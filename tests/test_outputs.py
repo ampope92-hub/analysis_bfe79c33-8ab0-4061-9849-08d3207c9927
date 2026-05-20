@@ -45,7 +45,9 @@ def test_game_script_is_executable():
 
 def test_game_script_accepts_document_argument(api_server):
     """game.py uses argparse or sys.argv to accept a document path."""
-    doc = next(Path("/app/documents").glob("*.txt"))
+    docs = list(Path("/app/documents").glob("*.txt"))
+    assert docs, "No .txt files found in /app/documents/"
+    doc = docs[0]
     proc = subprocess.run(
         [sys.executable, "/app/game.py", str(doc)],
         input="This is my summary.\n", capture_output=True, text=True,
@@ -104,16 +106,16 @@ def api_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    # Poll until Flask is accepting connections (up to 10 s)
-    for _ in range(20):
+    # Poll until Flask is accepting connections (up to 15 s)
+    for _ in range(30):
         try:
             req.get("http://localhost:5000/health", timeout=1)
             break
         except Exception:
             time.sleep(0.5)
     else:
-        # Even without /health, give Flask one more second then continue
-        time.sleep(1)
+        proc.terminate()
+        pytest.fail("Flask API did not start within 15 seconds — check that api/app.py exists and runs correctly")
 
     yield proc
 
