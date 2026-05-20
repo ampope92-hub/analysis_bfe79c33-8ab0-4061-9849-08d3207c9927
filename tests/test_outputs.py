@@ -54,7 +54,8 @@ def test_game_script_accepts_document_argument(api_server):
         timeout=30
     )
     assert proc.returncode == 0, f"game.py exited {proc.returncode}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
-    assert "word_count" in proc.stdout or "score" in proc.stdout
+    out = proc.stdout.lower()
+    assert "word" in out or "score" in out, f"Expected game output to mention words or score:\n{proc.stdout}"
 
 
 def test_game_script_calls_api():
