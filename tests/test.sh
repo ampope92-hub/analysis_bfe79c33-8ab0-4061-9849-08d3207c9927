@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Verifier dependencies are installed in environment/Dockerfile.
-# Add task-specific verifier-only Python packages there, not here.
-
 mkdir -p /logs/verifier
 
 # Check if we're in a valid working directory
