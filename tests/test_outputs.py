@@ -60,7 +60,7 @@ def test_game_script_accepts_document_argument(api_server):
     out = proc.stdout.lower()
     # Word count stat must be shown as a large number (document has 37 500+ words)
     assert "word" in out, f"Expected word count stats in game output:\n{proc.stdout}"
-    large_nums = [int(n.replace(",", "")) for n in re.findall(r'[\d,]+', out) if int(n.replace(",", "")) >= 10_000]
+    large_nums = [int(n.replace(",", "")) for n in re.findall(r'\d[\d,]*', out) if int(n.replace(",", "")) >= 10_000]
     assert large_nums, f"Expected a word count >= 10,000 displayed (doc is 37 500+ words):\n{proc.stdout}"
     # Numeric score from /evaluate must appear
     assert "score" in out, f"Expected evaluation score in game output:\n{proc.stdout}"
