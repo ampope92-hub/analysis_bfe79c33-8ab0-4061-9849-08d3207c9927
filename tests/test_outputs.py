@@ -58,11 +58,18 @@ def test_game_script_accepts_document_argument(api_server):
     )
     assert proc.returncode == 0, f"game.py exited {proc.returncode}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
     out = proc.stdout.lower()
+    # Word count stat must be shown as a large number (document has 37 500+ words)
     assert "word" in out, f"Expected word count stats in game output:\n{proc.stdout}"
+    large_nums = [int(n.replace(",", "")) for n in re.findall(r'[\d,]+', out) if int(n.replace(",", "")) >= 10_000]
+    assert large_nums, f"Expected a word count >= 10,000 displayed (doc is 37 500+ words):\n{proc.stdout}"
+    # Numeric score from /evaluate must appear
     assert "score" in out, f"Expected evaluation score in game output:\n{proc.stdout}"
     scores = re.findall(r'score[:\s]+(\d+(?:\.\d+)?)', out)
     assert scores, f"No numeric score found in game output:\n{proc.stdout}"
     assert 0 <= float(scores[0]) <= 100, f"Score {scores[0]} out of range"
+    # Feedback text from /evaluate must appear (not just the word "feedback")
+    feedback_match = re.search(r'feedback[:\s]+(.{10,})', out)
+    assert feedback_match, f"Expected feedback text from /evaluate in output:\n{proc.stdout}"
 
 
 def test_game_script_calls_api_at_runtime(api_server):
@@ -284,6 +291,44 @@ def test_evaluate_good_summary_outscores_poor(api_server):
         timeout=15,
     ).json()["score"]
 
-    assert good_score > poor_score, (
-        f"Good summary ({good_score}) should outscore poor summary ({poor_score})"
+    assert good_score > poor_score + 10, (
+        f"Good summary ({good_score:.1f}) should outscore poor summary ({poor_score:.1f}) by >10 points"
+    )
+
+
+def test_evaluate_coverage_beats_length(api_server):
+    """Topic coverage must drive the score — same-length off-topic summary must score much lower."""
+    import requests as req
+
+    original = (
+        "The Python programming language was created by Guido van Rossum. "
+        "Python emphasizes readability and simplicity with clear syntax. "
+        "It supports object-oriented, functional, and procedural paradigms. "
+    ) * 80
+
+    # Similar word counts (~22 words each), but only on_topic covers key terms
+    on_topic = (
+        "Python was created by Guido van Rossum and emphasizes readability "
+        "and simplicity, supporting object-oriented and functional paradigms."
+    )
+    off_topic = (
+        "The weather outside is pleasant today and colourful birds are singing "
+        "cheerfully in the tall green trees near the quiet river bank."
+    )
+
+    on_score = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": original, "summary": on_topic},
+        timeout=15,
+    ).json()["score"]
+
+    off_score = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": original, "summary": off_topic},
+        timeout=15,
+    ).json()["score"]
+
+    assert on_score > off_score + 20, (
+        f"On-topic summary ({on_score:.1f}) should outscore same-length off-topic summary "
+        f"({off_score:.1f}) by >20 points. Scorer must weight topic coverage, not just length."
     )
