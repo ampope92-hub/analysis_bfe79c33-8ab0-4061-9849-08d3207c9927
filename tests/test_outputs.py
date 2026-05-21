@@ -1,10 +1,13 @@
 import os
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 import pytest
+
+_FLASK_LOG = "/tmp/flask_server.log"
 
 # ---------------------------------------------------------------------------
 # Static / structural checks
@@ -55,13 +58,26 @@ def test_game_script_accepts_document_argument(api_server):
     )
     assert proc.returncode == 0, f"game.py exited {proc.returncode}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
     out = proc.stdout.lower()
-    assert "word" in out or "score" in out, f"Expected game output to mention words or score:\n{proc.stdout}"
+    assert "word" in out, f"Expected word count stats in game output:\n{proc.stdout}"
+    assert "score" in out, f"Expected evaluation score in game output:\n{proc.stdout}"
+    scores = re.findall(r'score[:\s]+(\d+(?:\.\d+)?)', out)
+    assert scores, f"No numeric score found in game output:\n{proc.stdout}"
+    assert 0 <= float(scores[0]) <= 100, f"Score {scores[0]} out of range"
 
 
-def test_game_script_calls_api():
-    """game.py makes HTTP requests to the API."""
-    content = Path("/app/game.py").read_text()
-    assert "requests" in content, "game.py does not appear to use the requests library"
+def test_game_script_calls_api_at_runtime(api_server):
+    """game.py calls /analyze and /evaluate on the Flask server at runtime."""
+    docs = list(Path("/app/documents").glob("*.txt"))
+    assert docs, "No .txt files found in /app/documents/"
+    proc = subprocess.run(
+        [sys.executable, "/app/game.py", str(docs[0])],
+        input="This is my summary.\n", capture_output=True, text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, f"game.py exited {proc.returncode}\nstderr: {proc.stderr}"
+    logs = Path(_FLASK_LOG).read_text()
+    assert "/analyze" in logs, f"No /analyze call found in Flask logs:\n{logs[-500:]}"
+    assert "/evaluate" in logs, f"No /evaluate call found in Flask logs:\n{logs[-500:]}"
 
 
 def test_requirements_file_exists():
@@ -99,13 +115,14 @@ def test_large_document_exists():
 
 @pytest.fixture(scope="module")
 def api_server():
-    """Start api/app.py, yield the process, terminate after tests."""
+    """Start api/app.py, log output to file, yield the process."""
     import requests as req
 
+    log = open(_FLASK_LOG, "w")
     proc = subprocess.Popen(
         [sys.executable, "/app/api/app.py"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=log,
+        stderr=log,
     )
     # Poll until Flask is accepting connections (up to 15 s)
     for _ in range(30):
@@ -116,6 +133,7 @@ def api_server():
             time.sleep(0.5)
     else:
         proc.terminate()
+        log.close()
         pytest.fail("Flask API did not start within 15 seconds — check that api/app.py exists and runs correctly")
 
     yield proc
@@ -125,6 +143,7 @@ def api_server():
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
+    log.close()
 
 
 def test_analyze_returns_200(api_server):
@@ -181,7 +200,13 @@ def test_analyze_returns_estimated_tokens(api_server):
     )
     data = r.json()
     assert "estimated_tokens" in data, f"estimated_tokens missing: {data}"
-    assert data["estimated_tokens"] > 0
+    # "word " * 1000 = 1000 words ≈ 1300 tokens; accept a wide band
+    assert data["estimated_tokens"] >= 800, (
+        f"estimated_tokens too low for 1000-word input: {data['estimated_tokens']}"
+    )
+    assert data["estimated_tokens"] <= 2000, (
+        f"estimated_tokens too high for 1000-word input: {data['estimated_tokens']}"
+    )
 
 
 def test_evaluate_returns_200(api_server):
