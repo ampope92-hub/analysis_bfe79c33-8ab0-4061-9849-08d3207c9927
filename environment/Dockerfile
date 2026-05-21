@@ -8,8 +8,6 @@ RUN apt-get update \
 
 RUN python -m pip install --no-cache-dir \
     flask==3.1.0 \
-    requests==2.32.3 \
-    pytest==8.3.5 \
-    pytest-json-ctrf==0.3.5
+    requests==2.32.3
 
 WORKDIR /app
