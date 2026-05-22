@@ -18,8 +18,8 @@ languages = [ "python", "bash" ]
 # For tool_specific, api_integration, and db_interaction subcategories, please include specific tool, api framework, or database software
 tags = [ "flask", "rest-api", "cli", "text-analysis", "nlp", "long-context" ]
 # Estimated time to complete (minutes)
-expert_time_estimate_min = 25
-junior_time_estimate_min = 60
+expert_time_estimate_min = 60
+junior_time_estimate_min = 120
 
 # Verifier: runs the test script to check task completion
 [verifier]
