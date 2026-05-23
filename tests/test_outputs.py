@@ -296,6 +296,19 @@ def test_evaluate_good_summary_outscores_poor(api_server):
     )
 
 
+def test_evaluate_rejects_missing_fields(api_server):
+    """POST /evaluate must return a 4xx error when required fields are missing."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": "Some text without a summary field."},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for missing 'summary' field; got {r.status_code}: {r.text[:200]}"
+    )
+
+
 def test_evaluate_feedback_differs_by_score(api_server):
     """Feedback must reflect the score, not be a single canned string."""
     import requests as req
