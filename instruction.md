@@ -13,6 +13,8 @@ Here's the structure I'm picturing:
 
 The `/analyze` response should include at least `word_count`, `key_terms` (a list), and `estimated_tokens`. The `/evaluate` response needs at least `score` (0–100 float) and `feedback` (a string explaining how well they did).
 
+One more endpoint: `POST /compare` for head-to-head scoring. Takes `{"original": "...", "summary_a": "...", "summary_b": "..."}` and returns `{"winner": "a" | "b" | "tie", "score_a": float, "score_b": float, "margin": float}`. `winner` must be exactly one of those three lowercase strings, `margin` is the absolute difference between the two scores (never negative), and identical summaries should produce a tie.
+
 Make sure `game.py` is executable. The API and game should work together when you start Flask in one terminal and run the game script in another. One thing — run the Flask app with `debug=False` (or just don't pass `debug=True`). Debug mode spawns a reloader process that can cause weird timeout issues when the server is started in the background.
 
 Important: the summary must be the only thing `game.py` reads from stdin. Don't add menus, mode selections, or any other prompts that consume input before the summary. The game should load the document, show the stats, then read the summary directly from stdin — nothing else. This lets it work non-interactively (e.g. `echo "my summary" | python game.py doc.txt`).

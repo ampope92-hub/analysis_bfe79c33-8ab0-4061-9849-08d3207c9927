@@ -121,6 +121,50 @@ def evaluate():
     })
 
 
+def _score(original, summary):
+    orig_terms = set(_key_terms(original, 30))
+    summ_words = set(_words(summary))
+    covered = sum(1 for t in orig_terms if t in summ_words)
+    coverage = (covered / len(orig_terms) * 100) if orig_terms else 0.0
+    orig_len = len(_words(original))
+    summ_len = len(_words(summary))
+    ratio = summ_len / orig_len if orig_len else 0.0
+    if 0.05 <= ratio <= 0.20:
+        length_score = 100.0
+    elif ratio < 0.05:
+        length_score = (ratio / 0.05) * 100.0
+    else:
+        length_score = max(0.0, 100.0 - ((ratio - 0.20) / 0.80) * 100.0)
+    return round(coverage * 0.7 + length_score * 0.3, 1)
+
+
+@app.route('/compare', methods=['POST'])
+def compare():
+    data = request.get_json(silent=True) or {}
+    original  = data.get('original')
+    summary_a = data.get('summary_a')
+    summary_b = data.get('summary_b')
+    if not original or summary_a is None or summary_b is None:
+        return jsonify({'error': 'Missing original, summary_a, or summary_b'}), 400
+
+    score_a = _score(original, summary_a)
+    score_b = _score(original, summary_b)
+    margin = abs(score_a - score_b)
+    if margin < 0.01:
+        winner = 'tie'
+    elif score_a > score_b:
+        winner = 'a'
+    else:
+        winner = 'b'
+
+    return jsonify({
+        'winner': winner,
+        'score_a': score_a,
+        'score_b': score_b,
+        'margin': round(margin, 2),
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 PYEOF

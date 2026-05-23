@@ -296,6 +296,54 @@ def test_evaluate_good_summary_outscores_poor(api_server):
     )
 
 
+def test_compare_returns_winner(api_server):
+    """A clearly better summary wins the comparison and margin is non-negative."""
+    import requests as req
+    original = "Python was created by Guido van Rossum and emphasizes readability. " * 80
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={
+            "original": original,
+            "summary_a": "Python was created by Guido van Rossum and emphasizes readability.",
+            "summary_b": "x",
+        },
+        timeout=15,
+    )
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text[:200]}"
+    data = r.json()
+    assert data.get("winner") == "a", f"Expected winner 'a', got {data.get('winner')!r}"
+    assert data["score_a"] > data["score_b"]
+    assert data["margin"] >= 0, f"margin must be non-negative (absolute); got {data['margin']}"
+
+
+def test_compare_handles_ties(api_server):
+    """Identical summaries must produce a tie."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={
+            "original": "The same text repeats here. " * 100,
+            "summary_a": "A summary about repeating text.",
+            "summary_b": "A summary about repeating text.",
+        },
+        timeout=15,
+    ).json()
+    assert r["winner"] == "tie", f"Identical summaries must tie; got {r['winner']!r}"
+
+
+def test_compare_rejects_missing_fields(api_server):
+    """POST /compare returns 4xx when summary_b is missing."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={"original": "some text", "summary_a": "a"},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for missing summary_b; got {r.status_code}: {r.text[:200]}"
+    )
+
+
 def test_evaluate_rejects_missing_fields(api_server):
     """POST /evaluate must return a 4xx error when required fields are missing."""
     import requests as req
