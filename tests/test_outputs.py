@@ -296,6 +296,31 @@ def test_evaluate_good_summary_outscores_poor(api_server):
     )
 
 
+def test_evaluate_feedback_differs_by_score(api_server):
+    """Feedback must reflect the score, not be a single canned string."""
+    import requests as req
+
+    original = "Climate change involves shifting global temperatures and weather patterns. " * 100
+
+    good = req.post(
+        "http://localhost:5000/evaluate",
+        json={
+            "original": original,
+            "summary": "Climate change involves shifting global temperatures and weather patterns.",
+        },
+        timeout=15,
+    ).json()
+    poor = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": original, "summary": "x"},
+        timeout=15,
+    ).json()
+
+    assert good["feedback"] != poor["feedback"], (
+        f"Feedback must vary with score; got identical string: {good['feedback']!r}"
+    )
+
+
 def test_evaluate_coverage_beats_length(api_server):
     """Topic coverage must drive the score — same-length off-topic summary must score much lower."""
     import requests as req
