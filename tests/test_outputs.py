@@ -216,6 +216,19 @@ def test_analyze_returns_estimated_tokens(api_server):
     )
 
 
+def test_analyze_rejects_missing_fields(api_server):
+    """POST /analyze returns 4xx when the required 'text' field is missing."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for missing 'text' field; got {r.status_code}: {r.text[:200]}"
+    )
+
+
 def test_evaluate_returns_200(api_server):
     """POST /evaluate returns HTTP 200."""
     import requests as req
