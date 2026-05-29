@@ -326,7 +326,10 @@ def test_compare_returns_winner(api_server):
     data = r.json()
     assert data.get("winner") == "a", f"Expected winner 'a', got {data.get('winner')!r}"
     assert data["score_a"] > data["score_b"]
-    assert data["margin"] >= 0, f"margin must be non-negative (absolute); got {data['margin']}"
+    assert abs(data["margin"] - abs(data["score_a"] - data["score_b"])) < 0.01, (
+        f"margin must equal abs(score_a - score_b); got margin={data['margin']}, "
+        f"score_a={data['score_a']}, score_b={data['score_b']}"
+    )
 
 
 def test_compare_handles_ties(api_server):
