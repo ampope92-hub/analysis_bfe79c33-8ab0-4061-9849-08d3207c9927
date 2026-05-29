@@ -11,7 +11,7 @@ Here's the structure I'm picturing:
 - `documents/` — a folder with at least one `.txt` file that's large enough to use (50k+ tokens)
 - `requirements.txt` — with `flask` and `requests` listed
 
-The `/analyze` response should include at least `word_count`, `key_terms` (a list), and `estimated_tokens`. The `/evaluate` response needs at least `score` (0–100 float) and `feedback` (a string explaining how well they did).
+The `/analyze` response should include at least `word_count`, `sentence_count`, `key_terms` (a list), and `estimated_tokens`. The `/evaluate` response needs at least `score` (0–100 float) and `feedback` (a string explaining how well they did).
 
 One more endpoint: `POST /compare` for head-to-head scoring. Takes `{"original": "...", "summary_a": "...", "summary_b": "..."}` and returns `{"winner": "a" | "b" | "tie", "score_a": float, "score_b": float, "margin": float}`. `winner` must be exactly one of those three lowercase strings, `margin` is the absolute difference between the two scores (never negative), and identical summaries should produce a tie.
 

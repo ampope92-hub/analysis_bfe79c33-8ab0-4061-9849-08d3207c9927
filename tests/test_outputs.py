@@ -180,6 +180,25 @@ def test_analyze_returns_word_count(api_server):
     )
 
 
+def test_analyze_returns_sentence_count(api_server):
+    """POST /analyze response includes a positive sentence_count integer."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "The cat sat on the mat. The dog barked loudly. Birds flew away. " * 50},
+        timeout=15,
+    )
+    data = r.json()
+    assert "sentence_count" in data, f"sentence_count missing from response: {data}"
+    assert isinstance(data["sentence_count"], int), (
+        f"sentence_count must be an int, got {type(data['sentence_count'])}"
+    )
+    # Input is 3 sentences * 50 = 150 sentences
+    assert 130 <= data["sentence_count"] <= 170, (
+        f"Expected ~150 sentences, got {data['sentence_count']}"
+    )
+
+
 def test_analyze_returns_key_terms(api_server):
     """POST /analyze response includes a non-empty key_terms list."""
     import requests as req
@@ -326,6 +345,29 @@ def test_compare_returns_winner(api_server):
     data = r.json()
     assert data.get("winner") == "a", f"Expected winner 'a', got {data.get('winner')!r}"
     assert data["score_a"] > data["score_b"]
+    assert abs(data["margin"] - abs(data["score_a"] - data["score_b"])) < 0.01, (
+        f"margin must equal abs(score_a - score_b); got margin={data['margin']}, "
+        f"score_a={data['score_a']}, score_b={data['score_b']}"
+    )
+
+
+def test_compare_b_wins(api_server):
+    """summary_b winning sets winner='b' and score_b > score_a."""
+    import requests as req
+    original = "Python was created by Guido van Rossum and emphasizes readability. " * 80
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={
+            "original": original,
+            "summary_a": "x",
+            "summary_b": "Python was created by Guido van Rossum and emphasizes readability.",
+        },
+        timeout=15,
+    )
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text[:200]}"
+    data = r.json()
+    assert data.get("winner") == "b", f"Expected winner 'b', got {data.get('winner')!r}"
+    assert data["score_b"] > data["score_a"]
     assert abs(data["margin"] - abs(data["score_a"] - data["score_b"])) < 0.01, (
         f"margin must equal abs(score_a - score_b); got margin={data['margin']}, "
         f"score_a={data['score_a']}, score_b={data['score_b']}"
