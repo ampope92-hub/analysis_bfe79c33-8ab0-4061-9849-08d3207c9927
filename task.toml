@@ -27,7 +27,7 @@ timeout_sec = 450.0
 
 # Agent: limits how long the agent can run when attempting the task
 [agent]
-timeout_sec = 900.0
+timeout_sec = 1800.0
 
 # Sandbox environment limits
 [environment]

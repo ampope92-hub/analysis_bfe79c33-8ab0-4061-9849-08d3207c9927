@@ -1,6 +1,7 @@
 #!/bin/bash
 
 mkdir -p /logs/verifier
+echo 0 > /logs/verifier/reward.txt
 
 # Check if we're in a valid working directory
 if [ "$PWD" = "/" ]; then

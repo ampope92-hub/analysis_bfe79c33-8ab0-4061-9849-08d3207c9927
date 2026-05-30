@@ -199,6 +199,23 @@ def test_analyze_returns_sentence_count(api_server):
     )
 
 
+def test_analyze_handles_no_sentence_punctuation(api_server):
+    """POST /analyze handles text with no sentence-ending punctuation without crashing."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "hello world"},
+        timeout=15,
+    )
+    assert r.status_code == 200, (
+        f"Expected 200 for unpunctuated text, got {r.status_code}: {r.text[:200]}"
+    )
+    data = r.json()
+    assert data.get("word_count", 0) >= 1
+    assert isinstance(data.get("sentence_count"), int)
+    assert data.get("sentence_count", -1) >= 0
+
+
 def test_analyze_returns_key_terms(api_server):
     """POST /analyze response includes a non-empty key_terms list."""
     import requests as req
@@ -387,6 +404,26 @@ def test_compare_handles_ties(api_server):
         timeout=15,
     ).json()
     assert r["winner"] == "tie", f"Identical summaries must tie; got {r['winner']!r}"
+
+
+def test_compare_tie_is_score_based(api_server):
+    """Tie detection must compare scores, not strings — summaries differing by trailing whitespace must tie."""
+    import requests as req
+    original = "Python was created by Guido van Rossum and emphasizes readability. " * 80
+    summary = "Python was created by Guido van Rossum and emphasizes readability."
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={
+            "original": original,
+            "summary_a": summary,
+            "summary_b": summary + " ",
+        },
+        timeout=15,
+    ).json()
+    assert r["winner"] == "tie", (
+        f"Summaries differing only by trailing whitespace must tie; got winner={r['winner']!r}. "
+        "Tie detection must compare scores, not strings."
+    )
 
 
 def test_compare_rejects_missing_fields(api_server):

@@ -2,7 +2,7 @@ Hey, I'm trying to build a little text-analysis game and I need someone to put t
 
 The idea: there's a Flask API that does two things — analyzes a long text document (returns word count, sentence count, key terms, etc.) and evaluates a user-written summary against the original (returns a 0–100 score based on how well the summary covers the key topics and has a sensible length). Then there's a separate game script that a player runs from the command line. It loads a big document, shows the player some stats about it, lets them read it and type in a summary, calls the API to score the summary, and prints their results.
 
-The "big document" part is important — we want the documents to be at least 50,000 tokens so there's actually a challenge to summarizing them. No cheating with tiny files.
+The "big document" part is important — the documents need to be at least 50,000 tokens so there's actually a challenge to summarizing them. No cheating with tiny files.
 
 Here's the structure I'm picturing:
 
@@ -19,4 +19,4 @@ All three endpoints should return a 400 error if any required field is missing f
 
 Make sure `game.py` is executable. The API and game should work together when you start Flask in one terminal and run the game script in another. One thing — run the Flask app with `debug=False` (or just don't pass `debug=True`). Debug mode spawns a reloader process that can cause weird timeout issues when the server is started in the background.
 
-Important: the summary must be the only thing `game.py` reads from stdin. Don't add menus, mode selections, or any other prompts that consume input before the summary. The game should load the document, show the stats, then read the summary directly from stdin — nothing else. This lets it work non-interactively (e.g. `echo "my summary" | python game.py doc.txt`).
+Important: the summary must be the only thing `game.py` reads from stdin. Don't add menus, mode selections, or any other prompts that consume input before the summary. The game should load the document, show the stats, then read the summary directly from stdin — nothing else. This lets it work non-interactively (e.g., `echo "my summary" | python game.py doc.txt`).
