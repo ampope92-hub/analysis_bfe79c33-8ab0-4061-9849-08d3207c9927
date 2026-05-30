@@ -51,7 +51,7 @@ def health():
 def analyze():
     data = request.get_json(silent=True) or {}
     text = data.get('text', '')
-    if not text:
+    if not text or not text.strip():
         return jsonify({'error': 'Missing text field'}), 400
 
     words = _words(text)
@@ -61,6 +61,7 @@ def analyze():
 
     return jsonify({
         'word_count': len(words),
+        'unique_word_count': len(set(words)),
         'sentence_count': len(sentences),
         'paragraph_count': len(paragraphs),
         'character_count': len(text),
@@ -74,7 +75,7 @@ def evaluate():
     data = request.get_json(silent=True) or {}
     original = data.get('original', '')
     summary  = data.get('summary', '')
-    if not original or not summary:
+    if not original or not original.strip() or not summary or not summary.strip():
         return jsonify({'error': 'Missing original or summary field'}), 400
 
     orig_terms  = set(_key_terms(original, 30))
@@ -144,8 +145,10 @@ def compare():
     original  = data.get('original')
     summary_a = data.get('summary_a')
     summary_b = data.get('summary_b')
-    if not original or summary_a is None or summary_b is None:
+    if not original or not original.strip() or summary_a is None or summary_b is None:
         return jsonify({'error': 'Missing original, summary_a, or summary_b'}), 400
+    if not str(summary_a).strip() or not str(summary_b).strip():
+        return jsonify({'error': 'summary_a and summary_b must not be whitespace-only'}), 400
 
     score_a = _score(original, summary_a)
     score_b = _score(original, summary_b)

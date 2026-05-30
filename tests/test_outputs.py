@@ -253,7 +253,7 @@ def test_analyze_returns_estimated_tokens(api_server):
 
 
 def test_analyze_rejects_missing_fields(api_server):
-    """POST /analyze returns 4xx when the required 'text' field is missing."""
+    """POST /analyze returns 4xx with a JSON body when the required 'text' field is missing."""
     import requests as req
     r = req.post(
         "http://localhost:5000/analyze",
@@ -263,6 +263,13 @@ def test_analyze_rejects_missing_fields(api_server):
     assert 400 <= r.status_code < 500, (
         f"Expected 4xx for missing 'text' field; got {r.status_code}: {r.text[:200]}"
     )
+    try:
+        body = r.json()
+    except Exception:
+        raise AssertionError(
+            f"400 response body must be valid JSON, not HTML. Got: {r.text[:200]}"
+        )
+    assert isinstance(body, dict), f"400 response must be a JSON object, got: {body}"
 
 
 def test_evaluate_returns_200(api_server):
@@ -427,7 +434,7 @@ def test_compare_tie_is_score_based(api_server):
 
 
 def test_compare_rejects_missing_fields(api_server):
-    """POST /compare returns 4xx when summary_b is missing."""
+    """POST /compare returns 4xx with a JSON body when summary_b is missing."""
     import requests as req
     r = req.post(
         "http://localhost:5000/compare",
@@ -437,10 +444,17 @@ def test_compare_rejects_missing_fields(api_server):
     assert 400 <= r.status_code < 500, (
         f"Expected 4xx for missing summary_b; got {r.status_code}: {r.text[:200]}"
     )
+    try:
+        body = r.json()
+    except Exception:
+        raise AssertionError(
+            f"400 response body must be valid JSON, not HTML. Got: {r.text[:200]}"
+        )
+    assert isinstance(body, dict), f"400 response must be a JSON object, got: {body}"
 
 
 def test_evaluate_rejects_missing_fields(api_server):
-    """POST /evaluate must return a 4xx error when required fields are missing."""
+    """POST /evaluate must return a 4xx JSON error when required fields are missing."""
     import requests as req
     r = req.post(
         "http://localhost:5000/evaluate",
@@ -450,6 +464,13 @@ def test_evaluate_rejects_missing_fields(api_server):
     assert 400 <= r.status_code < 500, (
         f"Expected 4xx for missing 'summary' field; got {r.status_code}: {r.text[:200]}"
     )
+    try:
+        body = r.json()
+    except Exception:
+        raise AssertionError(
+            f"400 response body must be valid JSON, not HTML. Got: {r.text[:200]}"
+        )
+    assert isinstance(body, dict), f"400 response must be a JSON object, got: {body}"
 
 
 def test_evaluate_feedback_differs_by_score(api_server):
@@ -512,4 +533,126 @@ def test_evaluate_coverage_beats_length(api_server):
     assert on_score > off_score + 20, (
         f"On-topic summary ({on_score:.1f}) should outscore same-length off-topic summary "
         f"({off_score:.1f}) by >20 points. Scorer must weight topic coverage, not just length."
+    )
+
+
+def test_analyze_rejects_whitespace_only_text(api_server):
+    """POST /analyze must return 400 when 'text' is present but contains only whitespace."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "   \t\n  "},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for whitespace-only 'text'; got {r.status_code}: {r.text[:200]}"
+    )
+    assert isinstance(r.json(), dict), "400 response must be a JSON object"
+
+
+def test_analyze_word_count_excludes_numbers(api_server):
+    """word_count must count only alphabetic tokens — digits and mixed tokens don't count."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "hello world 123 456 abc123 test"},
+        timeout=15,
+    )
+    data = r.json()
+    # Only "hello", "world", "test" are purely alphabetic (abc123 is mixed, 123/456 are digits)
+    assert data["word_count"] == 3, (
+        f"Expected word_count=3 (alphabetic only), got {data['word_count']}. "
+        f"Numbers and mixed tokens must not be counted."
+    )
+
+
+def test_analyze_returns_unique_word_count(api_server):
+    """POST /analyze must include unique_word_count — distinct alphabetic tokens, case-insensitive."""
+    import requests as req
+    # "hello" x3, "world" x2, "test" x1 → 3 unique words
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "hello world hello world hello test"},
+        timeout=15,
+    )
+    data = r.json()
+    assert "unique_word_count" in data, (
+        f"unique_word_count missing from /analyze response: {data}"
+    )
+    assert isinstance(data["unique_word_count"], int), (
+        f"unique_word_count must be an int, got {type(data['unique_word_count'])}: {data['unique_word_count']}"
+    )
+    assert data["unique_word_count"] == 3, (
+        f"Expected unique_word_count=3 for input with 3 distinct alphabetic words, got {data['unique_word_count']}"
+    )
+
+
+def test_compare_rejects_whitespace_only_summary_fields(api_server):
+    """POST /compare must return 400 when summary_a or summary_b is whitespace-only (same rule as /analyze)."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/compare",
+        json={"original": "some text here", "summary_a": "   \t", "summary_b": "real summary"},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for whitespace-only summary_a; got {r.status_code}: {r.text[:200]}"
+    )
+    assert isinstance(r.json(), dict), "400 response must be a JSON object"
+
+    r2 = req.post(
+        "http://localhost:5000/compare",
+        json={"original": "some text here", "summary_a": "real summary", "summary_b": "\n  \n"},
+        timeout=15,
+    )
+    assert 400 <= r2.status_code < 500, (
+        f"Expected 4xx for whitespace-only summary_b; got {r2.status_code}: {r2.text[:200]}"
+    )
+    assert isinstance(r2.json(), dict), "400 response must be a JSON object"
+
+
+def test_game_shows_sentence_count(api_server):
+    """game.py must display sentence count alongside the other document stats."""
+    docs = list(Path("/app/documents").glob("*.txt"))
+    assert docs, "No .txt files found in /app/documents/"
+    doc = docs[0]
+    proc = subprocess.run(
+        [sys.executable, "/app/game.py", str(doc)],
+        input="This is my summary.\n", capture_output=True, text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, f"game.py exited non-zero\nstderr: {proc.stderr}"
+    out = proc.stdout.lower()
+    assert "sentence" in out, (
+        f"Expected sentence count in game.py output — game should show stats from /analyze "
+        f"including sentence_count:\n{proc.stdout[:500]}"
+    )
+
+
+def test_compare_is_symmetric(api_server):
+    """compare(a, b) and compare(b, a) must produce swapped-but-equal scores and the same margin."""
+    import requests as req
+    original = "Python was created by Guido van Rossum and emphasizes readability. " * 80
+    summary_a = "Python was created by Guido van Rossum and emphasizes readability."
+    summary_b = "A completely unrelated sentence about the weather and birds."
+
+    ab = req.post(
+        "http://localhost:5000/compare",
+        json={"original": original, "summary_a": summary_a, "summary_b": summary_b},
+        timeout=15,
+    ).json()
+    ba = req.post(
+        "http://localhost:5000/compare",
+        json={"original": original, "summary_a": summary_b, "summary_b": summary_a},
+        timeout=15,
+    ).json()
+
+    assert abs(ab["score_a"] - ba["score_b"]) < 0.01, (
+        f"score_a in (a,b) must equal score_b in (b,a): {ab['score_a']} vs {ba['score_b']}"
+    )
+    assert abs(ab["score_b"] - ba["score_a"]) < 0.01, (
+        f"score_b in (a,b) must equal score_a in (b,a): {ab['score_b']} vs {ba['score_a']}"
+    )
+    assert abs(ab["margin"] - ba["margin"]) < 0.01, (
+        f"margin must be the same regardless of order: {ab['margin']} vs {ba['margin']}"
     )

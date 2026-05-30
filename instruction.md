@@ -15,7 +15,11 @@ The `/analyze` response should include at least `word_count`, `sentence_count`, 
 
 One more endpoint: `POST /compare` for head-to-head scoring. Takes `{"original": "...", "summary_a": "...", "summary_b": "..."}` and returns `{"winner": "a" | "b" | "tie", "score_a": float, "score_b": float, "margin": float}`. `winner` must be exactly one of those three lowercase strings, `margin` is the absolute difference between the two scores (never negative), and identical summaries should produce a tie.
 
-All three endpoints should return a 400 error if any required field is missing from the request body — don't silently default to empty strings or zero values.
+All three endpoints should return a 400 error if any required field is missing from the request body — don't silently default to empty strings or zero values. Also treat a field that is present but contains only whitespace the same as a missing field — return 400. The 400 response body must be valid JSON (not an HTML error page) — Flask's built-in `abort(400)` returns HTML, so return a JSON response explicitly.
+
+`word_count` must count only alphabetic tokens — digits, punctuation-only tokens, and mixed alphanumeric strings like "abc123" don't count as words.
+
+The `/compare` endpoint must be symmetric: swapping `summary_a` and `summary_b` must produce the same scores (just swapped) and the same `margin`.
 
 Make sure `game.py` is executable. The API and game should work together when you start Flask in one terminal and run the game script in another. One thing — run the Flask app with `debug=False` (or just don't pass `debug=True`). Debug mode spawns a reloader process that can cause weird timeout issues when the server is started in the background.
 
