@@ -550,6 +550,44 @@ def test_analyze_rejects_whitespace_only_text(api_server):
     assert isinstance(r.json(), dict), "400 response must be a JSON object"
 
 
+def test_evaluate_rejects_whitespace_only_fields(api_server):
+    """POST /evaluate must return 400 when 'original' or 'summary' is present but whitespace-only."""
+    import requests as req
+    # whitespace-only summary
+    r = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": "Some real original text here.", "summary": "   \t\n  "},
+        timeout=15,
+    )
+    assert 400 <= r.status_code < 500, (
+        f"Expected 4xx for whitespace-only 'summary'; got {r.status_code}: {r.text[:200]}"
+    )
+    try:
+        body = r.json()
+    except Exception:
+        raise AssertionError(
+            f"400 response body must be valid JSON, not HTML. Got: {r.text[:200]}"
+        )
+    assert isinstance(body, dict), f"400 response must be a JSON object, got: {body}"
+
+    # whitespace-only original
+    r2 = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": "\n  \t ", "summary": "A real summary."},
+        timeout=15,
+    )
+    assert 400 <= r2.status_code < 500, (
+        f"Expected 4xx for whitespace-only 'original'; got {r2.status_code}: {r2.text[:200]}"
+    )
+    try:
+        body2 = r2.json()
+    except Exception:
+        raise AssertionError(
+            f"400 response body must be valid JSON, not HTML. Got: {r2.text[:200]}"
+        )
+    assert isinstance(body2, dict), f"400 response must be a JSON object, got: {body2}"
+
+
 def test_analyze_word_count_excludes_numbers(api_server):
     """word_count must count only alphabetic tokens — digits and mixed tokens don't count."""
     import requests as req
@@ -569,10 +607,12 @@ def test_analyze_word_count_excludes_numbers(api_server):
 def test_analyze_returns_unique_word_count(api_server):
     """POST /analyze must include unique_word_count — distinct alphabetic tokens, case-insensitive."""
     import requests as req
-    # "hello" x3, "world" x2, "test" x1 → 3 unique words
+    # Mixed case on purpose: Hello/hello/HELLO and World/WORLD must collapse
+    # case-insensitively → {hello, world, test} = 3 unique words. A case-SENSITIVE
+    # implementation would report 6 here, so this input distinguishes the two.
     r = req.post(
         "http://localhost:5000/analyze",
-        json={"text": "hello world hello world hello test"},
+        json={"text": "Hello hello HELLO World WORLD test"},
         timeout=15,
     )
     data = r.json()
@@ -583,7 +623,8 @@ def test_analyze_returns_unique_word_count(api_server):
         f"unique_word_count must be an int, got {type(data['unique_word_count'])}: {data['unique_word_count']}"
     )
     assert data["unique_word_count"] == 3, (
-        f"Expected unique_word_count=3 for input with 3 distinct alphabetic words, got {data['unique_word_count']}"
+        f"Expected unique_word_count=3 (case-insensitive: hello/world/test), got "
+        f"{data['unique_word_count']}. A case-sensitive count would wrongly return 6."
     )
 
 
