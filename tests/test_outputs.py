@@ -722,6 +722,75 @@ def test_game_shows_sentence_count(api_server):
     )
 
 
+def test_endpoints_reject_non_string_fields(api_server):
+    """Fields present but not strings (numbers, lists) must yield a 400 JSON error, not a 500."""
+    import requests as req
+    cases = [
+        ("/analyze", {"text": 12345}),
+        ("/analyze", {"text": ["a", "b", "c"]}),
+        ("/evaluate", {"original": "Some valid original text here.", "summary": 999}),
+        ("/compare", {"original": "Some valid text.", "summary_a": ["x"], "summary_b": "y"}),
+    ]
+    for path, body in cases:
+        r = req.post(f"http://localhost:5000{path}", json=body, timeout=15)
+        assert 400 <= r.status_code < 500, (
+            f"{path} with non-string field {body!r} must return 4xx (not a 500 crash); "
+            f"got {r.status_code}: {r.text[:200]}"
+        )
+        try:
+            assert isinstance(r.json(), dict)
+        except ValueError:
+            raise AssertionError(
+                f"{path} error response must be valid JSON, not HTML. Got: {r.text[:200]}"
+            )
+
+
+def test_analyze_key_terms_no_duplicates(api_server):
+    """key_terms must be a list of distinct terms — no repeated entries."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "elephant savanna elephant mammoth savanna elephant rhinoceros mammoth " * 50},
+        timeout=15,
+    )
+    terms = r.json()["key_terms"]
+    assert len(terms) == len(set(terms)), (
+        f"key_terms must not contain duplicates; got {terms}"
+    )
+
+
+def test_analyze_accepts_text_with_no_words(api_server):
+    """Text that has content but no alphabetic words must return 200 with word_count 0, not error."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "123 456 789 !!! ??? ..."},
+        timeout=15,
+    )
+    assert r.status_code == 200, (
+        f"Non-whitespace text with no real words must return 200, got {r.status_code}: {r.text[:200]}"
+    )
+    data = r.json()
+    assert data["word_count"] == 0, f"Expected word_count 0 for digits/punctuation only, got {data['word_count']}"
+    assert data["unique_word_count"] == 0, f"Expected unique_word_count 0, got {data['unique_word_count']}"
+
+
+def test_evaluate_handles_original_without_key_terms(api_server):
+    """An original made only of stopwords yields no key terms — /evaluate must still score, not crash."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": "the the and and of of a an it is to in on " * 10,
+              "summary": "A short summary about several different things."},
+        timeout=15,
+    )
+    assert r.status_code == 200, (
+        f"/evaluate must not crash when the original has no key terms; got {r.status_code}: {r.text[:200]}"
+    )
+    data = r.json()
+    assert "score" in data and 0 <= data["score"] <= 100, f"Expected a valid score, got: {data}"
+
+
 def test_compare_is_symmetric(api_server):
     """compare(a, b) and compare(b, a) must produce swapped-but-equal scores and the same margin."""
     import requests as req
