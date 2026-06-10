@@ -10,8 +10,6 @@ flask>=3.0.0
 requests>=2.31.0
 EOF
 
-pip install --quiet -r requirements.txt 2>/dev/null || true
-
 # ── Flask API ────────────────────────────────────────────────────────────────
 cat > api/app.py << 'PYEOF'
 from flask import Flask, request, jsonify
