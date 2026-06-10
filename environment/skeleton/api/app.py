@@ -1,6 +1,5 @@
 """Text-analysis API. Work in progress — known to be flaky, several things are wrong."""
 from flask import Flask, request, jsonify, abort
-import re
 from collections import Counter
 
 app = Flask(__name__)
@@ -55,7 +54,6 @@ def evaluate():
 @app.route('/compare', methods=['POST'])
 def compare():
     data = request.get_json(silent=True) or {}
-    original = data.get('original', '')
     a = data.get('summary_a', '')
     b = data.get('summary_b', '')
 
