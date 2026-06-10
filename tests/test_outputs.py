@@ -604,6 +604,58 @@ def test_analyze_word_count_excludes_numbers(api_server):
     )
 
 
+def test_analyze_word_count_counts_contractions_and_hyphens(api_server):
+    """Contractions and hyphenated words count once; numeric/mixed tokens are rejected."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "don't well-known cats can't co-operate 123 well123"},
+        timeout=15,
+    )
+    data = r.json()
+    # don't, well-known, cats, can't, co-operate = 5 words;
+    # "123" (digits) and "well123" (mixed) must NOT count.
+    assert data["word_count"] == 5, (
+        f"Expected word_count=5 (contractions/hyphenated count once, numeric/mixed "
+        f"tokens excluded), got {data['word_count']}"
+    )
+
+
+def test_analyze_sentence_count_ignores_abbreviations_and_decimals(api_server):
+    """sentence_count must not split on decimals (3.5) or title abbreviations (Dr./Mr.)."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "Dr. Smith measured 3.5 degrees today. Mr. Jones agreed. The team left."},
+        timeout=15,
+    )
+    data = r.json()
+    # Three real sentences; a naive split on '.' would report many more.
+    assert data["sentence_count"] == 3, (
+        f"Expected sentence_count=3 — periods in 'Dr.', 'Mr.', and '3.5' must not end "
+        f"a sentence. Got {data['sentence_count']}."
+    )
+
+
+def test_analyze_key_terms_excludes_stopwords(api_server):
+    """key_terms must filter common stopwords, even frequent multi-letter ones."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "there there there would would about elephant elephant savanna savanna mammoth " * 20},
+        timeout=15,
+    )
+    data = r.json()
+    terms = [t.lower() for t in data["key_terms"]]
+    for stop in ("there", "would", "about"):
+        assert stop not in terms, (
+            f"Stopword {stop!r} must not appear in key_terms; got {terms}"
+        )
+    assert any("elephant" in t for t in terms), (
+        f"Expected real topic words like 'elephant' in key_terms; got {terms}"
+    )
+
+
 def test_analyze_returns_unique_word_count(api_server):
     """POST /analyze must include unique_word_count — distinct alphabetic tokens, case-insensitive."""
     import requests as req

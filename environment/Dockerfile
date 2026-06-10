@@ -13,3 +13,7 @@ RUN python -m pip install --no-cache-dir \
     pytest-json-ctrf==0.3.5
 
 WORKDIR /app
+
+# Ship the half-finished, buggy project the agent must debug and complete.
+COPY skeleton/ /app/
+RUN chmod 644 /app/game.py
