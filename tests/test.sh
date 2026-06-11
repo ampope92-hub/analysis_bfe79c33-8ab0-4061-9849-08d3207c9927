@@ -9,12 +9,10 @@ if [ "$PWD" = "/" ]; then
     exit 1
 fi
 
-# Run tests
+# Run tests and record the reward from the captured exit code (REQUIRED)
 python -m pytest -o cache_dir=/tmp/pytest_cache \
   --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
 pytest_rc=$?
-
-# Produce reward file (REQUIRED)
 if [ "$pytest_rc" -eq 0 ]; then
     echo 1 > /logs/verifier/reward.txt
 else
