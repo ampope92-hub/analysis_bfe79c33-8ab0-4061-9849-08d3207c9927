@@ -791,6 +791,83 @@ def test_evaluate_handles_original_without_key_terms(api_server):
     assert "score" in data and 0 <= data["score"] <= 100, f"Expected a valid score, got: {data}"
 
 
+def test_compare_scores_match_evaluate(api_server):
+    """A summary's score_a from /compare must equal the score /evaluate gives the same summary."""
+    import requests as req
+    original = "Python was created by Guido van Rossum and emphasizes readability. " * 80
+    summary = "Python was created by Guido van Rossum and emphasizes readability."
+
+    eval_score = req.post(
+        "http://localhost:5000/evaluate",
+        json={"original": original, "summary": summary},
+        timeout=15,
+    ).json()["score"]
+
+    cmp_score_a = req.post(
+        "http://localhost:5000/compare",
+        json={"original": original, "summary_a": summary, "summary_b": "unrelated weather text"},
+        timeout=15,
+    ).json()["score_a"]
+
+    assert abs(eval_score - cmp_score_a) < 0.01, (
+        f"/compare score_a ({cmp_score_a}) must match /evaluate score ({eval_score}) for the same "
+        f"original+summary. Both endpoints must use the same scoring."
+    )
+
+
+def test_sentence_count_terminator_edge_cases(api_server):
+    """A final sentence without punctuation still counts; runs of terminators collapse to one."""
+    import requests as req
+    # No trailing period on the last sentence — must still count it.
+    r1 = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "First sentence here. Second sentence has no period"},
+        timeout=15,
+    ).json()
+    assert r1["sentence_count"] == 2, (
+        f"Expected 2 sentences (final one lacks a period), got {r1['sentence_count']}"
+    )
+    # Consecutive terminators must not each start a new sentence.
+    r2 = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "Wait... what?! Really."},
+        timeout=15,
+    ).json()
+    assert r2["sentence_count"] == 3, (
+        f"Expected 3 sentences — runs like '...' and '?!' must collapse to one boundary, "
+        f"got {r2['sentence_count']}"
+    )
+
+
+def test_analyze_handles_arbitrary_whitespace(api_server):
+    """Word counting must split on any whitespace — newlines, tabs, and runs of spaces."""
+    import requests as req
+    r = req.post(
+        "http://localhost:5000/analyze",
+        json={"text": "alpha\n\nbeta\tgamma   delta\r\nepsilon"},
+        timeout=15,
+    )
+    data = r.json()
+    assert data["word_count"] == 5, (
+        f"Expected 5 words across mixed whitespace (newlines/tabs/multiple spaces), "
+        f"got {data['word_count']}"
+    )
+
+
+def test_analyze_key_terms_ordered_by_frequency(api_server):
+    """key_terms must be ordered by descending frequency — the more frequent term comes first."""
+    import requests as req
+    # "elephant" appears far more often than "rhinoceros"; both are real, non-stopword terms.
+    text = ("elephant " * 8 + "rhinoceros " * 2 + "savanna grasslands migration herds ") * 30
+    r = req.post("http://localhost:5000/analyze", json={"text": text}, timeout=15)
+    terms = [t.lower() for t in r.json()["key_terms"]]
+    assert "elephant" in terms and "rhinoceros" in terms, f"Expected both terms present: {terms}"
+    assert terms.index("elephant") < terms.index("rhinoceros"), (
+        f"key_terms must be frequency-ordered; 'elephant' (more frequent) must precede "
+        f"'rhinoceros'. Got order: {terms}"
+    )
+
+
 def test_compare_is_symmetric(api_server):
     """compare(a, b) and compare(b, a) must produce swapped-but-equal scores and the same margin."""
     import requests as req
