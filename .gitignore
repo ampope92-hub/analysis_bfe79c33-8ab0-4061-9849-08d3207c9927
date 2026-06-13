@@ -1,4 +1,4 @@
+.snorkel_config
+CLAUDE.md
 jobs/
-terminus.sh
-**/__pycache__/
-*.pyc
+*.Zone.Identifier
