@@ -11,8 +11,8 @@ mkdir -p api documents
 
 # ── requirements.txt ────────────────────────────────────────────────────────
 cat > requirements.txt << 'EOF'
-flask>=3.0.0
-requests>=2.31.0
+flask==3.1.0
+requests==2.32.3
 EOF
 
 # ── Flask API (corrected) ────────────────────────────────────────────────────
