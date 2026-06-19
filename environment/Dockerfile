@@ -6,11 +6,8 @@ RUN apt-get update \
         asciinema \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python -m pip install --no-cache-dir \
-    flask==3.1.0 \
-    requests==2.32.3 \
-    pytest==8.3.5 \
-    pytest-json-ctrf==0.3.5
+COPY requirements.lock /tmp/requirements.lock
+RUN python -m pip install --require-hashes --no-deps --no-cache-dir -r /tmp/requirements.lock
 
 WORKDIR /app
 
